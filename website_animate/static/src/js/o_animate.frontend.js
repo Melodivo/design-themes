@@ -15,8 +15,28 @@ var WebsiteAnimate = {
         var self   = this;
         self.$scrollingElement = $().getScrollingElement();
         self.items = $("#wrapwrap .o_animate");
+
+        // Fix for "transform: none" not overriding keyframe transforms on
+        // some iPhone using Safari. Note that all animated elements are checked
+        // (not only one) as the bug is not systematic and may depend on some
+        // other conditions (for example: an animated image in a block which is
+        // hidden on mobile would not have the issue).
+        const couldOverflowBecauseOfSafariBug = [...this.items].some(el => {
+            return window.getComputedStyle(el).transform !== 'none';
+        });
+        self.forceOverflowXHidden = false;
+        if (couldOverflowBecauseOfSafariBug) {
+            self._toggleOverflowXHidden(true);
+            // Now prevent any call to _toggleOverflowXHidden to have an effect
+            self.forceOverflowXHidden = true;
+        }
+
         self.items.each(function () {
             var $el = $(this);
+            if ($el[0].closest('.dropdown')) {
+                $el[0].classList.add('o_animate_in_dropdown');
+                return;
+            }
             // Set all monitored elements to initial state
             self.reset_animation($el);
         });
@@ -48,7 +68,7 @@ var WebsiteAnimate = {
             var direction = (windowTop < lastScroll) ? -1 : 1;
             lastScroll = windowTop;
 
-            $("#wrapwrap .o_animate").each(function () {
+            $("#wrapwrap .o_animate:not(.o_animate_in_dropdown)").each(function () {
                 var $el       = $(this);
                 var elHeight  = $el.height();
                 var elOffset  = direction * Math.max((elHeight * self.offsetRatio), self.offsetMin);
@@ -108,6 +128,9 @@ var WebsiteAnimate = {
 
     // show/hide the horizontal scrollbar (on the #wrapwrap)
     _toggleOverflowXHidden: function (add) {
+        if (this.forceOverflowXHidden) {
+            return;
+        }
         if (add) {
             this.$scrollingElement[0].classList.add('o_wanim_overflow_x_hidden');
         } else if (!this.$scrollingElement.find('.o_animating').length) {
@@ -152,7 +175,7 @@ publicWidget.registry.WebsiteAnimate = publicWidget.Widget.extend({
         this._super.apply(this, arguments);
 
         this.$target.find('.o_animate')
-            .removeClass('o_animating o_animated o_animate_preview')
+            .removeClass('o_animating o_animated o_animate_preview o_animate_in_dropdown')
             .css({
                 'animation-name': '',
                 'animation-play-state': '',
